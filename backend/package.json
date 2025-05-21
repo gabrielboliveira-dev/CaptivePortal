@@ -22,7 +22,9 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@types/radius": "^0.0.33",
     "pg": "^8.16.0",
-    "prisma": "^6.7.0"
+    "prisma": "^6.7.0",
+    "radius": "^1.1.4"
   }
 }
