@@ -1,0 +1,15 @@
+model AcceptedTerm {
+  id        String   @id @default(uuid())
+  clientId  String // Ou outro identificador do cliente (MAC, IP, etc.)
+  timestamp DateTime @default(now())
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
