@@ -1,5 +1,6 @@
+import * as dgram from 'dgram';
 import { RadiusPacket } from 'radius';
-import { RemoteInfo } from 'dgram'; 
+import { RemoteInfo } from 'dgram';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -8,13 +9,22 @@ const RADIUS_SECRET = process.env.RADIUS_SECRET || 'SUA_SENHA_MUITO_SEGURA_NO_EN
 const RADIUS_PORT = parseInt(process.env.RADIUS_PORT || '1812');
 
 const radius: any = require('radius'); 
+const server = dgram.createSocket('udp4'); 
 
-const server = radius.createServer(async (packet: RadiusPacket, rinfo: RemoteInfo) => {
-    console.log(`Recebemos uma mensagem do roteador de ${rinfo.address}:${rinfo.port}`);
+server.on('message', async (msg: Buffer, rinfo: RemoteInfo) => {
+    console.log(`[RADIUS] Recebemos uma mensagem UDP do roteador de ${rinfo.address}:${rinfo.port}`);
+
+    let packet: RadiusPacket;
+    try {
+        packet = radius.decode({ packet: msg, secret: RADIUS_SECRET });
+    } catch (err) {
+        console.error(`[RADIUS] ERRO ao decodificar pacote RADIUS de ${rinfo.address}:`, err);
+        return;
+    }
 
     if (packet.code === 'Access-Request') {
         const callingStationId = packet.attributes['Calling-Station-Id'] || packet.attributes['User-Name'] || 'cliente_desconhecido_radius';
-        console.log(`Pedido de acesso para o cliente: ${callingStationId}`);
+        console.log(`[RADIUS] Pedido de acesso para o cliente: ${callingStationId}`);
 
         let accessGranted = false;
 
@@ -27,13 +37,13 @@ const server = radius.createServer(async (packet: RadiusPacket, rinfo: RemoteInf
 
             if (acceptedClient) {
                 accessGranted = true;
-                console.log(`Cliente ${callingStationId} encontrado no banco. Liberando acesso.`);
+                console.log(`[RADIUS] Cliente ${callingStationId} encontrado no banco. Liberando acesso.`);
             } else {
-                console.log(`Cliente ${callingStationId} NÃO encontrado no banco. Negando acesso.`);
+                console.log(`[RADIUS] Cliente ${callingStationId} NÃO encontrado no banco. Negando acesso.`);
             }
 
         } catch (error) {
-            console.error('ERRO ao consultar o banco de dados:', error);
+            console.error('[RADIUS] ERRO ao consultar o banco de dados:', error);
             accessGranted = false;
         }
 
@@ -47,37 +57,37 @@ const server = radius.createServer(async (packet: RadiusPacket, rinfo: RemoteInf
 
         server.send(response, rinfo.port, rinfo.address, (err: Error | null) => {
             if (err) {
-                console.error('ERRO ao enviar resposta RADIUS:', err);
+                console.error('[RADIUS] ERRO ao enviar resposta RADIUS:', err);
             } else {
-                console.log(`Resposta '${responseCode}' enviada para ${rinfo.address}`);
+                console.log(`[RADIUS] Resposta '${responseCode}' enviada para ${rinfo.address}`);
             }
         });
 
     } else if (packet.code === 'Accounting-Request') {
-        console.log(`Requisição de Contabilidade (Accounting-Request) de ${rinfo.address}`);
+        console.log(`[RADIUS] Requisição de Contabilidade (Accounting-Request) de ${rinfo.address}`);
         const response = radius.encode_response({
             packet: packet,
             code: 'Accounting-Response',
             secret: RADIUS_SECRET
         });
         server.send(response, rinfo.port, rinfo.address, (err: Error | null) => {
-            if (err) console.error('ERRO ao enviar resposta de contabilidade:', err);
+            if (err) console.error('[RADIUS] ERRO ao enviar resposta de contabilidade:', err);
         });
     } else {
-        console.log(`Pacote RADIUS inesperado recebido: ${packet.code}`);
+        console.log(`[RADIUS] Pacote RADIUS inesperado recebido: ${packet.code}`);
     }
 });
 
-// ===========================================================================
-// INICIALIZAÇÃO DO SERVIDOR RADIUS
-// ===========================================================================
-
 server.on('error', (err: Error) => {
-    console.error('ERRO GERAL no servidor RADIUS:', err);
+    console.error('[RADIUS] ERRO GERAL no servidor UDP/RADIUS:', err);
+    server.close();
 });
 
-server.bind(RADIUS_PORT, () => {
-    console.log(`Servidor RADIUS rodando e escutando na porta ${RADIUS_PORT}!`);
+server.on('listening', () => {
+    const address = server.address();
+    console.log(`[RADIUS] Servidor RADIUS rodando e escutando na porta ${address.port} no endereço ${address.address}!`);
 });
+
+server.bind(RADIUS_PORT, '0.0.0.0');
 
 export default server;
