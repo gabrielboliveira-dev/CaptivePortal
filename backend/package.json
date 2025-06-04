@@ -13,17 +13,18 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@types/express": "^5.0.1",
     "@types/node": "^22.15.18",
     "@types/pg": "^8.15.1",
     "@types/radius": "^0.0.33",
-    "express": "^5.1.0",
+    "@types/express": "^4.17.21",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",
+    "@types/express": "^5.0.2",
+    "express": "^5.1.0",
     "pg": "^8.16.0",
     "prisma": "^6.7.0",
     "radius": "^1.1.4"
